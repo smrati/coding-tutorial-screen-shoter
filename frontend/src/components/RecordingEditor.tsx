@@ -14,6 +14,7 @@ export default function RecordingEditor() {
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const editorWrapperRef = useRef<HTMLDivElement>(null);
   const [capturing, setCapturing] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
   const { screenshots, title, refresh, upload, remove } =
     useScreenshots(recordingId);
@@ -22,6 +23,28 @@ export default function RecordingEditor() {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  // Keep new screenshots selected by default
+  useEffect(() => {
+    setSelectedIds(new Set(screenshots.map((s) => s.id)));
+  }, [screenshots]);
+
+  const toggleSelect = useCallback((screenshotId: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(screenshotId)) next.delete(screenshotId);
+      else next.add(screenshotId);
+      return next;
+    });
+  }, []);
+
+  const selectAll = useCallback(() => {
+    setSelectedIds(new Set(screenshots.map((s) => s.id)));
+  }, [screenshots]);
+
+  const deselectAll = useCallback(() => {
+    setSelectedIds(new Set());
+  }, []);
 
   const handleEditorReady = useCallback(
     (editor: monaco.editor.IStandaloneCodeEditor) => {
@@ -57,9 +80,10 @@ export default function RecordingEditor() {
   }, [handleCapture]);
 
   const handleExport = useCallback(async () => {
-    if (screenshots.length === 0) return;
-    await exportScreenshotsAsZip(recordingId, screenshots, title);
-  }, [recordingId, screenshots, title]);
+    const selected = screenshots.filter((s) => selectedIds.has(s.id));
+    if (selected.length === 0) return;
+    await exportScreenshotsAsZip(recordingId, selected, title);
+  }, [recordingId, screenshots, selectedIds, title]);
 
   return (
     <div className="flex flex-col h-[calc(100vh-56px)] bg-gray-950">
@@ -79,6 +103,10 @@ export default function RecordingEditor() {
         <ScreenshotPanel
           recordingId={recordingId}
           screenshots={screenshots}
+          selectedIds={selectedIds}
+          onToggleSelect={toggleSelect}
+          onSelectAll={selectAll}
+          onDeselectAll={deselectAll}
           onDelete={remove}
         />
       </div>
