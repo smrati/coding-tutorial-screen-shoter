@@ -48,9 +48,10 @@ export const exportScreenshotsUrl = (recordingId: number) =>
 
 export const exportVideoUrl = (
   recordingId: number,
-  screenshotIds: number[],
-  duration: number = 2.0
+  slideDurations: Map<number, number>
 ) => {
-  const params = screenshotIds.map((id) => `ids=${id}`).join("&");
-  return `/api/v1/recordings/${recordingId}/screenshots/export-video?${params}&duration=${duration}`;
+  const params = Array.from(slideDurations.entries())
+    .map(([id, dur]) => `slides=${id}:${dur}`)
+    .join("&");
+  return `/api/v1/recordings/${recordingId}/screenshots/export-video?${params}`;
 };

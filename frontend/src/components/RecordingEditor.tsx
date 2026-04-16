@@ -29,6 +29,10 @@ export default function RecordingEditor() {
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
   const [exportingVideo, setExportingVideo] = useState(false);
   const [initialCode, setInitialCode] = useState<string | undefined>(undefined);
+  const [globalDuration, setGlobalDuration] = useState(2.0);
+  const [slideDurations, setSlideDurations] = useState<Map<number, number>>(
+    new Map()
+  );
 
   const { screenshots, title, refresh, upload, remove } =
     useScreenshots(recordingId);
@@ -138,19 +142,27 @@ export default function RecordingEditor() {
   }, [recordingId, screenshots, selectedIds, title]);
 
   const handleExportVideo = useCallback(async () => {
-    const selectedIdsArr = screenshots
-      .filter((s) => selectedIds.has(s.id))
-      .map((s) => s.id);
-    if (selectedIdsArr.length === 0) return;
+    const selected = screenshots.filter((s) => selectedIds.has(s.id));
+    if (selected.length === 0) return;
     setExportingVideo(true);
     try {
-      await exportScreenshotsAsVideo(recordingId, selectedIdsArr, title);
+      const slideDurationMap = new Map(
+        selected.map((s) => {
+          const custom = slideDurations.get(s.id);
+          return [s.id, custom ?? globalDuration];
+        })
+      );
+      await exportScreenshotsAsVideo(
+        recordingId,
+        slideDurationMap,
+        title
+      );
     } catch (err) {
       console.error("Video export failed:", err);
     } finally {
       setExportingVideo(false);
     }
-  }, [recordingId, screenshots, selectedIds, title]);
+  }, [recordingId, screenshots, selectedIds, title, globalDuration, slideDurations]);
 
   const handlePreview = useCallback((index: number) => {
     setPreviewIndex(index);
@@ -162,6 +174,29 @@ export default function RecordingEditor() {
 
   const handleNavigatePreview = useCallback((index: number) => {
     setPreviewIndex(index);
+  }, []);
+
+  const handleGlobalDurationChange = useCallback((d: number) => {
+    setGlobalDuration(d);
+  }, []);
+
+  const handleSlideDurationChange = useCallback(
+    (id: number, d: number) => {
+      setSlideDurations((prev) => {
+        const next = new Map(prev);
+        next.set(id, d);
+        return next;
+      });
+    },
+    []
+  );
+
+  const handleSlideDurationReset = useCallback((id: number) => {
+    setSlideDurations((prev) => {
+      const next = new Map(prev);
+      next.delete(id);
+      return next;
+    });
   }, []);
 
   return (
@@ -187,11 +222,16 @@ export default function RecordingEditor() {
           recordingId={recordingId}
           screenshots={screenshots}
           selectedIds={selectedIds}
+          globalDuration={globalDuration}
+          slideDurations={slideDurations}
           onToggleSelect={toggleSelect}
           onSelectAll={selectAll}
           onDeselectAll={deselectAll}
           onDelete={remove}
           onPreview={handlePreview}
+          onGlobalDurationChange={handleGlobalDurationChange}
+          onSlideDurationChange={handleSlideDurationChange}
+          onSlideDurationReset={handleSlideDurationReset}
         />
       </div>
       {previewIndex !== null && (

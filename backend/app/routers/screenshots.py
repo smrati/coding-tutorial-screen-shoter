@@ -137,11 +137,29 @@ async def export_screenshots(
 @router.get("/export-video")
 async def export_video(
     recording_id: int,
-    ids: list[int] = Query(...),
-    duration: float = Query(2.0),
+    slides: list[str] = Query(
+        ..., description="Format: screenshot_id:duration, e.g. 1:2.0&slides=2:3.5"
+    ),
     db: AsyncSession = Depends(get_db),
 ):
     recording = await _get_recording_or_404(recording_id, db)
+
+    slide_specs = []
+    for spec in slides:
+        try:
+            sid, dur = spec.split(":")
+            slide_specs.append((int(sid), float(dur)))
+        except (ValueError, IndexError):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid slide spec '{spec}'. Use id:duration format.",
+            )
+
+    if not slide_specs:
+        raise HTTPException(status_code=404, detail="No slides to export")
+
+    ids = [s[0] for s in slide_specs]
+    duration_map = dict(slide_specs)
 
     screenshots = (
         await db.execute(
@@ -161,16 +179,29 @@ async def export_video(
         frames_dir = Path(tmpdir) / "frames"
         frames_dir.mkdir()
 
+        concat_lines = []
         for i, shot in enumerate(screenshots):
-            (frames_dir / f"frame_{i:04d}.png").write_bytes(shot.image_data)
+            frame_path = frames_dir / f"frame_{i:04d}.png"
+            frame_path.write_bytes(shot.image_data)
+            dur = duration_map.get(shot.id, 2.0)
+            concat_lines.append(f"file '{frame_path}'")
+            concat_lines.append(f"duration {dur}")
+
+        if screenshots:
+            last_frame = frames_dir / f"frame_{len(screenshots) - 1:04d}.png"
+            concat_lines.append(f"file '{last_frame}'")
+
+        concat_path = Path(tmpdir) / "concat.txt"
+        concat_path.write_text("\n".join(concat_lines))
 
         output_path = Path(tmpdir) / "output.mp4"
 
         cmd = [
             "ffmpeg",
             "-y",
-            "-framerate", str(1 / duration),
-            "-i", str(frames_dir / "frame_%04d.png"),
+            "-f", "concat",
+            "-safe", "0",
+            "-i", str(concat_path),
             "-c:v", "libx264",
             "-pix_fmt", "yuv420p",
             "-vf", "fps=30,format=yuv420p",

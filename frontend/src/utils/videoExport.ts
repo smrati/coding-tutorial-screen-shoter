@@ -19,11 +19,10 @@ function formatExportFilename(recordingTitle: string): string {
 
 export async function exportScreenshotsAsVideo(
   recordingId: number,
-  screenshotIds: number[],
-  recordingTitle: string,
-  duration: number = 2.0
+  slideDurations: Map<number, number>,
+  recordingTitle: string
 ) {
-  const url = exportVideoUrl(recordingId, screenshotIds, duration);
+  const url = exportVideoUrl(recordingId, slideDurations);
   const resp = await fetch(url);
   if (!resp.ok) {
     const err = await resp.text();
