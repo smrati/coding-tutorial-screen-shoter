@@ -1,6 +1,22 @@
 import { saveAs } from "file-saver";
 import { exportVideoUrl } from "../services/api";
 
+function formatExportFilename(recordingTitle: string): string {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const timestamp = [
+    now.getFullYear(),
+    pad(now.getMonth() + 1),
+    pad(now.getDate()),
+    "_",
+    pad(now.getHours()),
+    pad(now.getMinutes()),
+    pad(now.getSeconds()),
+  ].join("");
+  const safeName = recordingTitle.replace(/\s+/g, "_");
+  return `${safeName}_${timestamp}`;
+}
+
 export async function exportScreenshotsAsVideo(
   recordingId: number,
   screenshotIds: number[],
@@ -14,5 +30,5 @@ export async function exportScreenshotsAsVideo(
     throw new Error(err);
   }
   const blob = await resp.blob();
-  saveAs(blob, `${recordingTitle}.mp4`);
+  saveAs(blob, `${formatExportFilename(recordingTitle)}.mp4`);
 }
