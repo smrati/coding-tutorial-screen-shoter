@@ -4,6 +4,7 @@ import type * as monaco from "monaco-editor";
 import CodeEditor from "./CodeEditor";
 import EditorToolbar from "./EditorToolbar";
 import ScreenshotPanel from "./ScreenshotPanel";
+import SlidePreviewModal from "./SlidePreviewModal";
 import { useScreenshots } from "../hooks/useScreenshots";
 import { useScreenshotCapture } from "../hooks/useScreenshotCapture";
 import { exportScreenshotsAsZip } from "../utils/zipExport";
@@ -15,6 +16,7 @@ export default function RecordingEditor() {
   const editorWrapperRef = useRef<HTMLDivElement>(null);
   const [capturing, setCapturing] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
   const { screenshots, title, refresh, upload, remove } =
     useScreenshots(recordingId);
@@ -85,6 +87,18 @@ export default function RecordingEditor() {
     await exportScreenshotsAsZip(recordingId, selected, title);
   }, [recordingId, screenshots, selectedIds, title]);
 
+  const handlePreview = useCallback((index: number) => {
+    setPreviewIndex(index);
+  }, []);
+
+  const handleClosePreview = useCallback(() => {
+    setPreviewIndex(null);
+  }, []);
+
+  const handleNavigatePreview = useCallback((index: number) => {
+    setPreviewIndex(index);
+  }, []);
+
   return (
     <div className="flex flex-col h-[calc(100vh-56px)] bg-gray-950">
       <EditorToolbar
@@ -108,8 +122,18 @@ export default function RecordingEditor() {
           onSelectAll={selectAll}
           onDeselectAll={deselectAll}
           onDelete={remove}
+          onPreview={handlePreview}
         />
       </div>
+      {previewIndex !== null && (
+        <SlidePreviewModal
+          recordingId={recordingId}
+          screenshots={screenshots}
+          currentIndex={previewIndex}
+          onClose={handleClosePreview}
+          onNavigate={handleNavigatePreview}
+        />
+      )}
     </div>
   );
 }

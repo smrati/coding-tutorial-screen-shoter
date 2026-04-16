@@ -7,6 +7,7 @@ interface Props {
   selected: boolean;
   onToggleSelect: () => void;
   onDelete: () => void;
+  onPreview: () => void;
 }
 
 export default function ScreenshotCard({
@@ -16,11 +17,12 @@ export default function ScreenshotCard({
   selected,
   onToggleSelect,
   onDelete,
+  onPreview,
 }: Props) {
   return (
     <div
       className={`group relative bg-gray-700 rounded-lg overflow-hidden cursor-pointer border-2 ${selected ? "border-blue-500" : "border-transparent"}`}
-      onClick={onToggleSelect}
+      onClick={onPreview}
     >
       <img
         src={screenshotImageUrl(recordingId, screenshotId)}

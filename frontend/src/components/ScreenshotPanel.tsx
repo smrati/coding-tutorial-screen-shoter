@@ -9,6 +9,7 @@ interface Props {
   onSelectAll: () => void;
   onDeselectAll: () => void;
   onDelete: (screenshotId: number) => void;
+  onPreview: (index: number) => void;
 }
 
 export default function ScreenshotPanel({
@@ -19,6 +20,7 @@ export default function ScreenshotPanel({
   onSelectAll,
   onDeselectAll,
   onDelete,
+  onPreview,
 }: Props) {
   const allSelected = screenshots.length > 0 && selectedIds.size === screenshots.length;
 
@@ -42,7 +44,7 @@ export default function ScreenshotPanel({
           Press Ctrl+S or click Screenshot to capture
         </p>
       ) : (
-        screenshots.map((s) => (
+        screenshots.map((s, index) => (
           <ScreenshotCard
             key={s.id}
             recordingId={recordingId}
@@ -51,6 +53,7 @@ export default function ScreenshotPanel({
             selected={selectedIds.has(s.id)}
             onToggleSelect={() => onToggleSelect(s.id)}
             onDelete={() => onDelete(s.id)}
+            onPreview={() => onPreview(index)}
           />
         ))
       )}
