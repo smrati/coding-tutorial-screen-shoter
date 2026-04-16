@@ -1,26 +1,37 @@
 import type { Screenshot } from "../types";
 import ScreenshotCard from "./ScreenshotCard";
+import DurationPopover from "./DurationPopover";
 
 interface Props {
   recordingId: number;
   screenshots: Screenshot[];
   selectedIds: Set<number>;
+  globalDuration: number;
+  slideDurations: Map<number, number>;
   onToggleSelect: (id: number) => void;
   onSelectAll: () => void;
   onDeselectAll: () => void;
   onDelete: (screenshotId: number) => void;
   onPreview: (index: number) => void;
+  onGlobalDurationChange: (duration: number) => void;
+  onSlideDurationChange: (id: number, duration: number) => void;
+  onSlideDurationReset: (id: number) => void;
 }
 
 export default function ScreenshotPanel({
   recordingId,
   screenshots,
   selectedIds,
+  globalDuration,
+  slideDurations,
   onToggleSelect,
   onSelectAll,
   onDeselectAll,
   onDelete,
   onPreview,
+  onGlobalDurationChange,
+  onSlideDurationChange,
+  onSlideDurationReset,
 }: Props) {
   const allSelected = screenshots.length > 0 && selectedIds.size === screenshots.length;
 
@@ -39,23 +50,44 @@ export default function ScreenshotPanel({
           </button>
         )}
       </div>
+      {screenshots.length > 0 && (
+        <div className="flex items-center justify-between">
+          <span className="text-gray-500 text-xs">Default duration</span>
+          <DurationPopover
+            value={globalDuration}
+            onChange={onGlobalDurationChange}
+          >
+            <span className="text-gray-300 text-xs bg-gray-700 px-2 py-0.5 rounded cursor-pointer hover:bg-gray-600">
+              {globalDuration}s
+            </span>
+          </DurationPopover>
+        </div>
+      )}
       {screenshots.length === 0 ? (
         <p className="text-gray-600 text-sm text-center mt-8">
           Press Ctrl+S or click Screenshot to capture
         </p>
       ) : (
-        screenshots.map((s, index) => (
-          <ScreenshotCard
-            key={s.id}
-            recordingId={recordingId}
-            screenshotId={s.id}
-            slideNumber={s.slide_number}
-            selected={selectedIds.has(s.id)}
-            onToggleSelect={() => onToggleSelect(s.id)}
-            onDelete={() => onDelete(s.id)}
-            onPreview={() => onPreview(index)}
-          />
-        ))
+        screenshots.map((s, index) => {
+          const custom = slideDurations.get(s.id);
+          const duration = custom ?? globalDuration;
+          return (
+            <ScreenshotCard
+              key={s.id}
+              recordingId={recordingId}
+              screenshotId={s.id}
+              slideNumber={s.slide_number}
+              selected={selectedIds.has(s.id)}
+              duration={duration}
+              isCustomDuration={custom !== undefined}
+              onToggleSelect={() => onToggleSelect(s.id)}
+              onDelete={() => onDelete(s.id)}
+              onPreview={() => onPreview(index)}
+              onDurationChange={(d) => onSlideDurationChange(s.id, d)}
+              onDurationReset={() => onSlideDurationReset(s.id)}
+            />
+          );
+        })
       )}
     </div>
   );

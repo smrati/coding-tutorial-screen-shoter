@@ -1,13 +1,18 @@
 import { screenshotImageUrl } from "../services/api";
+import DurationPopover from "./DurationPopover";
 
 interface Props {
   recordingId: number;
   screenshotId: number;
   slideNumber: number;
   selected: boolean;
+  duration: number;
+  isCustomDuration: boolean;
   onToggleSelect: () => void;
   onDelete: () => void;
   onPreview: () => void;
+  onDurationChange: (duration: number) => void;
+  onDurationReset: () => void;
 }
 
 export default function ScreenshotCard({
@@ -15,9 +20,13 @@ export default function ScreenshotCard({
   screenshotId,
   slideNumber,
   selected,
+  duration,
+  isCustomDuration,
   onToggleSelect,
   onDelete,
   onPreview,
+  onDurationChange,
+  onDurationReset,
 }: Props) {
   return (
     <div
@@ -53,6 +62,29 @@ export default function ScreenshotCard({
       >
         X
       </button>
+
+      <div
+        className="absolute bottom-1 left-1/2 -translate-x-1/2"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <DurationPopover
+          value={duration}
+          onChange={onDurationChange}
+          showReset={isCustomDuration}
+          onReset={onDurationReset}
+        >
+          <span
+            className={`text-xs px-1.5 py-0.5 rounded cursor-pointer ${
+              isCustomDuration
+                ? "bg-blue-600/80 text-white"
+                : "bg-black/50 text-gray-400"
+            }`}
+          >
+            {duration}s
+          </span>
+        </DurationPopover>
+      </div>
+
       {!selected && (
         <div className="absolute inset-0 bg-black/40 pointer-events-none" />
       )}
