@@ -45,3 +45,12 @@ export const deleteScreenshot = (recordingId: number, screenshotId: number) =>
 
 export const exportScreenshotsUrl = (recordingId: number) =>
   `/api/v1/recordings/${recordingId}/screenshots/export`;
+
+export const exportVideoUrl = (
+  recordingId: number,
+  screenshotIds: number[],
+  duration: number = 2.0
+) => {
+  const params = screenshotIds.map((id) => `ids=${id}`).join("&");
+  return `/api/v1/recordings/${recordingId}/screenshots/export-video?${params}&duration=${duration}`;
+};

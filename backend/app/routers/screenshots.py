@@ -1,7 +1,10 @@
 import io
+import subprocess
+import tempfile
 import zipfile
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query
 from fastapi.responses import Response
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -127,5 +130,68 @@ async def export_screenshots(
         media_type="application/zip",
         headers={
             "Content-Disposition": f'attachment; filename="{recording.title}.zip"'
+        },
+    )
+
+
+@router.get("/export-video")
+async def export_video(
+    recording_id: int,
+    ids: list[int] = Query(...),
+    duration: float = Query(2.0),
+    db: AsyncSession = Depends(get_db),
+):
+    recording = await _get_recording_or_404(recording_id, db)
+
+    screenshots = (
+        await db.execute(
+            select(Screenshot)
+            .where(
+                Screenshot.recording_id == recording_id,
+                Screenshot.id.in_(ids),
+            )
+            .order_by(Screenshot.slide_number)
+        )
+    ).scalars().all()
+
+    if not screenshots:
+        raise HTTPException(status_code=404, detail="No screenshots to export")
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        frames_dir = Path(tmpdir) / "frames"
+        frames_dir.mkdir()
+
+        for i, shot in enumerate(screenshots):
+            (frames_dir / f"frame_{i:04d}.png").write_bytes(shot.image_data)
+
+        output_path = Path(tmpdir) / "output.mp4"
+
+        cmd = [
+            "ffmpeg",
+            "-y",
+            "-framerate", str(1 / duration),
+            "-i", str(frames_dir / "frame_%04d.png"),
+            "-c:v", "libx264",
+            "-pix_fmt", "yuv420p",
+            "-vf", "fps=30,format=yuv420p",
+            str(output_path),
+        ]
+
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=120,
+        )
+        if result.returncode != 0:
+            raise HTTPException(
+                status_code=500,
+                detail=f"ffmpeg failed: {result.stderr[-500:]}",
+            )
+
+        video_bytes = output_path.read_bytes()
+
+    return Response(
+        content=video_bytes,
+        media_type="video/mp4",
+        headers={
+            "Content-Disposition": f'attachment; filename="{recording.title}.mp4"'
         },
     )
