@@ -8,6 +8,16 @@ import SlidePreviewModal from "./SlidePreviewModal";
 import { useScreenshots } from "../hooks/useScreenshots";
 import { useScreenshotCapture } from "../hooks/useScreenshotCapture";
 import { exportScreenshotsAsZip } from "../utils/zipExport";
+import { exportScreenshotsAsVideo } from "../utils/videoExport";
+
+const STORAGE_KEY = (id: number) => `editor_code_${id}`;
+
+const DEFAULT_CODE = `# Write your Python code here
+# Press Ctrl+S (Cmd+S on Mac) to capture a screenshot
+
+def hello():
+    print('Hello, World!')
+`;
 
 export default function RecordingEditor() {
   const { id } = useParams<{ id: string }>();
@@ -17,6 +27,8 @@ export default function RecordingEditor() {
   const [capturing, setCapturing] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  const [exportingVideo, setExportingVideo] = useState(false);
+  const [initialCode, setInitialCode] = useState<string | undefined>(undefined);
 
   const { screenshots, title, refresh, upload, remove } =
     useScreenshots(recordingId);
@@ -26,10 +38,48 @@ export default function RecordingEditor() {
     refresh();
   }, [refresh]);
 
-  // Keep new screenshots selected by default
   useEffect(() => {
     setSelectedIds(new Set(screenshots.map((s) => s.id)));
   }, [screenshots]);
+
+  useEffect(() => {
+    if (screenshots.length === 0) return;
+
+    const stored = localStorage.getItem(STORAGE_KEY(recordingId));
+    if (stored !== null) return;
+
+    const lastSnapshot = [...screenshots]
+      .reverse()
+      .find((s) => s.code_snapshot);
+
+    if (lastSnapshot?.code_snapshot) {
+      localStorage.setItem(STORAGE_KEY(recordingId), lastSnapshot.code_snapshot);
+      editorRef.current?.setValue(lastSnapshot.code_snapshot);
+    }
+  }, [screenshots, recordingId]);
+
+  const loadInitialCode = useCallback((): string => {
+    const stored = localStorage.getItem(STORAGE_KEY(recordingId));
+    if (stored !== null) return stored;
+
+    const lastSnapshot = [...screenshots]
+      .reverse()
+      .find((s) => s.code_snapshot);
+    if (lastSnapshot?.code_snapshot) return lastSnapshot.code_snapshot;
+
+    return DEFAULT_CODE;
+  }, [screenshots, recordingId]);
+
+  useEffect(() => {
+    setInitialCode(loadInitialCode());
+  }, [loadInitialCode]);
+
+  const handleCodeChange = useCallback(
+    (value: string) => {
+      localStorage.setItem(STORAGE_KEY(recordingId), value);
+    },
+    [recordingId]
+  );
 
   const toggleSelect = useCallback((screenshotId: number) => {
     setSelectedIds((prev) => {
@@ -87,6 +137,21 @@ export default function RecordingEditor() {
     await exportScreenshotsAsZip(recordingId, selected, title);
   }, [recordingId, screenshots, selectedIds, title]);
 
+  const handleExportVideo = useCallback(async () => {
+    const selectedIdsArr = screenshots
+      .filter((s) => selectedIds.has(s.id))
+      .map((s) => s.id);
+    if (selectedIdsArr.length === 0) return;
+    setExportingVideo(true);
+    try {
+      await exportScreenshotsAsVideo(recordingId, selectedIdsArr, title);
+    } catch (err) {
+      console.error("Video export failed:", err);
+    } finally {
+      setExportingVideo(false);
+    }
+  }, [recordingId, screenshots, selectedIds, title]);
+
   const handlePreview = useCallback((index: number) => {
     setPreviewIndex(index);
   }, []);
@@ -105,13 +170,17 @@ export default function RecordingEditor() {
         title={title}
         onCapture={handleCapture}
         onExport={handleExport}
+        onExportVideo={handleExportVideo}
         capturing={capturing}
+        exportingVideo={exportingVideo}
       />
       <div className="flex flex-1 min-h-0">
         <div className="flex-1 min-w-0 p-2">
           <CodeEditor
             onEditorReady={handleEditorReady}
             wrapperRef={editorWrapperRef}
+            initialValue={initialCode}
+            onChange={handleCodeChange}
           />
         </div>
         <ScreenshotPanel
