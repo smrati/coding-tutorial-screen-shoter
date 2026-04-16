@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams } from "react-router-dom";
-import type * as monaco from "monaco-editor";
-import CodeEditor from "./CodeEditor";
+import MarkdownEditor, { DEFAULT_MARKDOWN } from "./MarkdownEditor";
 import EditorToolbar from "./EditorToolbar";
 import ScreenshotPanel from "./ScreenshotPanel";
 import SlidePreviewModal from "./SlidePreviewModal";
@@ -12,23 +11,15 @@ import { exportScreenshotsAsVideo } from "../utils/videoExport";
 
 const STORAGE_KEY = (id: number) => `editor_code_${id}`;
 
-const DEFAULT_CODE = `# Write your Python code here
-# Press Ctrl+S (Cmd+S on Mac) to capture a screenshot
-
-def hello():
-    print('Hello, World!')
-`;
-
 export default function RecordingEditor() {
   const { id } = useParams<{ id: string }>();
   const recordingId = Number(id);
-  const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
-  const editorWrapperRef = useRef<HTMLDivElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
   const [capturing, setCapturing] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
   const [exportingVideo, setExportingVideo] = useState(false);
-  const [initialCode, setInitialCode] = useState<string | undefined>(undefined);
+  const [editorValue, setEditorValue] = useState<string | undefined>(undefined);
   const [globalDuration, setGlobalDuration] = useState(2.0);
   const [slideDurations, setSlideDurations] = useState<Map<number, number>>(
     new Map()
@@ -36,7 +27,7 @@ export default function RecordingEditor() {
 
   const { screenshots, title, refresh, upload, remove } =
     useScreenshots(recordingId);
-  const captureScreenshot = useScreenshotCapture(editorWrapperRef);
+  const captureScreenshot = useScreenshotCapture(previewRef);
 
   useEffect(() => {
     refresh();
@@ -46,23 +37,7 @@ export default function RecordingEditor() {
     setSelectedIds(new Set(screenshots.map((s) => s.id)));
   }, [screenshots]);
 
-  useEffect(() => {
-    if (screenshots.length === 0) return;
-
-    const stored = localStorage.getItem(STORAGE_KEY(recordingId));
-    if (stored !== null) return;
-
-    const lastSnapshot = [...screenshots]
-      .reverse()
-      .find((s) => s.code_snapshot);
-
-    if (lastSnapshot?.code_snapshot) {
-      localStorage.setItem(STORAGE_KEY(recordingId), lastSnapshot.code_snapshot);
-      editorRef.current?.setValue(lastSnapshot.code_snapshot);
-    }
-  }, [screenshots, recordingId]);
-
-  const loadInitialCode = useCallback((): string => {
+  const loadInitialValue = useCallback((): string => {
     const stored = localStorage.getItem(STORAGE_KEY(recordingId));
     if (stored !== null) return stored;
 
@@ -71,15 +46,16 @@ export default function RecordingEditor() {
       .find((s) => s.code_snapshot);
     if (lastSnapshot?.code_snapshot) return lastSnapshot.code_snapshot;
 
-    return DEFAULT_CODE;
+    return DEFAULT_MARKDOWN;
   }, [screenshots, recordingId]);
 
   useEffect(() => {
-    setInitialCode(loadInitialCode());
-  }, [loadInitialCode]);
+    setEditorValue(loadInitialValue());
+  }, [loadInitialValue]);
 
-  const handleCodeChange = useCallback(
+  const handleEditorChange = useCallback(
     (value: string) => {
+      setEditorValue(value);
       localStorage.setItem(STORAGE_KEY(recordingId), value);
     },
     [recordingId]
@@ -102,18 +78,11 @@ export default function RecordingEditor() {
     setSelectedIds(new Set());
   }, []);
 
-  const handleEditorReady = useCallback(
-    (editor: monaco.editor.IStandaloneCodeEditor) => {
-      editorRef.current = editor;
-    },
-    []
-  );
-
   const handleCapture = useCallback(async () => {
     if (capturing) return;
     setCapturing(true);
     try {
-      const code = editorRef.current?.getValue() || "";
+      const code = editorValue || "";
       const blob = await captureScreenshot();
       await upload(blob, code);
     } catch (err) {
@@ -121,9 +90,8 @@ export default function RecordingEditor() {
     } finally {
       setCapturing(false);
     }
-  }, [capturing, captureScreenshot, upload]);
+  }, [capturing, captureScreenshot, upload, editorValue]);
 
-  // Ctrl+S / Cmd+S shortcut
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "s") {
@@ -211,11 +179,11 @@ export default function RecordingEditor() {
       />
       <div className="flex flex-1 min-h-0">
         <div className="flex-1 min-w-0 p-2">
-          <CodeEditor
-            onEditorReady={handleEditorReady}
-            wrapperRef={editorWrapperRef}
-            initialValue={initialCode}
-            onChange={handleCodeChange}
+          <MarkdownEditor
+            initialValue={editorValue}
+            value={editorValue ?? ""}
+            onChange={handleEditorChange}
+            previewRef={previewRef}
           />
         </div>
         <ScreenshotPanel
