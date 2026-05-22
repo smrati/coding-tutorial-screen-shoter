@@ -40,5 +40,11 @@ export function useScreenshots(recordingId: number | null) {
     [recordingId]
   );
 
-  return { screenshots, title, refresh, upload, remove };
+  const updateScreenshot = useCallback((updated: Screenshot) => {
+    setScreenshots((prev) =>
+      prev.map((s) => (s.id === updated.id ? { ...s, ...updated } : s))
+    );
+  }, []);
+
+  return { screenshots, title, refresh, upload, remove, updateScreenshot };
 }

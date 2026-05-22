@@ -6,6 +6,7 @@ from app.deps import get_db
 from app.models.recording import Recording
 from app.models.screenshot import Screenshot
 from app.schemas.recording import RecordingCreate, RecordingDetail, RecordingResponse, RecordingUpdate
+from app.schemas.screenshot import ScreenshotMeta
 
 router = APIRouter(prefix="/api/v1/recordings", tags=["recordings"])
 
@@ -72,7 +73,7 @@ async def get_recording(recording_id: int, db: AsyncSession = Depends(get_db)):
         screenshot_count=len(screenshots),
         created_at=recording.created_at,
         updated_at=recording.updated_at,
-        screenshots=screenshots,
+        screenshots=[ScreenshotMeta.model_validate_screenshot(s) for s in screenshots],
     )
 
 

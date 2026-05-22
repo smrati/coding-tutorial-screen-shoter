@@ -10,7 +10,8 @@ export function useScreenshotCapture(
 
     const canvas = await html2canvas(el, {
       backgroundColor: "#0d1117",
-      scale: 2,
+      width: 1920,
+      height: 1080,
       useCORS: true,
       logging: false,
     });

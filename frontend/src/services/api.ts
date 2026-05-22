@@ -40,8 +40,43 @@ export const uploadScreenshot = (
 export const screenshotImageUrl = (recordingId: number, screenshotId: number) =>
   `/api/v1/recordings/${recordingId}/screenshots/${screenshotId}/image`;
 
+export const screenshotAudioUrl = (recordingId: number, screenshotId: number) =>
+  `/api/v1/recordings/${recordingId}/screenshots/${screenshotId}/audio`;
+
 export const deleteScreenshot = (recordingId: number, screenshotId: number) =>
   api.delete(`/recordings/${recordingId}/screenshots/${screenshotId}`);
+
+export const updateNarration = (
+  recordingId: number,
+  screenshotId: number,
+  narrationText: string
+) =>
+  api
+    .put<Screenshot>(
+      `/recordings/${recordingId}/screenshots/${screenshotId}/narration`,
+      { narration_text: narrationText }
+    )
+    .then((r) => r.data);
+
+export const generateAudio = (recordingId: number, screenshotId: number) =>
+  api
+    .post<Screenshot>(
+      `/recordings/${recordingId}/screenshots/${screenshotId}/generate-audio`
+    )
+    .then((r) => r.data);
+
+export const updatePadding = (
+  recordingId: number,
+  screenshotId: number,
+  leftPadding: number,
+  rightPadding: number
+) =>
+  api
+    .put<Screenshot>(
+      `/recordings/${recordingId}/screenshots/${screenshotId}/padding`,
+      { left_padding: leftPadding, right_padding: rightPadding }
+    )
+    .then((r) => r.data);
 
 export const exportScreenshotsUrl = (recordingId: number) =>
   `/api/v1/recordings/${recordingId}/screenshots/export`;
@@ -54,4 +89,11 @@ export const exportVideoUrl = (
     .map(([id, dur]) => `slides=${id}:${dur}`)
     .join("&");
   return `/api/v1/recordings/${recordingId}/screenshots/export-video?${params}`;
+};
+
+export const uploadImage = async (file: File): Promise<string> => {
+  const form = new FormData();
+  form.append("image", file);
+  const res = await api.post<{ url: string }>("/images", form);
+  return res.data.url;
 };
