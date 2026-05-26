@@ -28,3 +28,7 @@ Thumbs.db
 
 # Project specific
 backend/data/app.db
+.antigravity/*
+.antigravity*
+backend/app/data/*
+backend/data/*

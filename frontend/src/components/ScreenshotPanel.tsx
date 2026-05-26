@@ -8,6 +8,7 @@ interface Props {
   selectedIds: Set<number>;
   globalDuration: number;
   slideDurations: Map<number, number>;
+  audioGeneratingIds: Set<number>;
   onToggleSelect: (id: number) => void;
   onSelectAll: () => void;
   onDeselectAll: () => void;
@@ -16,6 +17,9 @@ interface Props {
   onGlobalDurationChange: (duration: number) => void;
   onSlideDurationChange: (id: number, duration: number) => void;
   onSlideDurationReset: (id: number) => void;
+  onNarrationChange: (id: number, text: string) => void;
+  onGenerateAudio: (id: number) => void;
+  onPaddingChange: (id: number, left: number, right: number) => void;
 }
 
 export default function ScreenshotPanel({
@@ -24,6 +28,7 @@ export default function ScreenshotPanel({
   selectedIds,
   globalDuration,
   slideDurations,
+  audioGeneratingIds,
   onToggleSelect,
   onSelectAll,
   onDeselectAll,
@@ -32,11 +37,14 @@ export default function ScreenshotPanel({
   onGlobalDurationChange,
   onSlideDurationChange,
   onSlideDurationReset,
+  onNarrationChange,
+  onGenerateAudio,
+  onPaddingChange,
 }: Props) {
   const allSelected = screenshots.length > 0 && selectedIds.size === screenshots.length;
 
   return (
-    <div className="w-72 bg-gray-900 border-l border-gray-700 overflow-y-auto p-3 space-y-3">
+    <div className="w-80 bg-gray-900 border-l border-gray-700 overflow-y-auto p-3 space-y-3">
       <div className="flex items-center justify-between">
         <h3 className="text-gray-400 text-sm font-semibold uppercase tracking-wide">
           Slides ({selectedIds.size}/{screenshots.length})
@@ -80,11 +88,20 @@ export default function ScreenshotPanel({
               selected={selectedIds.has(s.id)}
               duration={duration}
               isCustomDuration={custom !== undefined}
+              narrationText={s.narration_text}
+              hasAudio={s.has_audio}
+              audioDuration={s.audio_duration}
+              leftPadding={s.left_padding}
+              rightPadding={s.right_padding}
+              isGeneratingAudio={audioGeneratingIds.has(s.id)}
               onToggleSelect={() => onToggleSelect(s.id)}
               onDelete={() => onDelete(s.id)}
               onPreview={() => onPreview(index)}
               onDurationChange={(d) => onSlideDurationChange(s.id, d)}
               onDurationReset={() => onSlideDurationReset(s.id)}
+              onNarrationChange={(text) => onNarrationChange(s.id, text)}
+              onGenerateAudio={() => onGenerateAudio(s.id)}
+              onPaddingChange={(left, right) => onPaddingChange(s.id, left, right)}
             />
           );
         })
