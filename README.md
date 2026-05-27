@@ -84,7 +84,7 @@ API docs are available at [http://localhost:8000/docs](http://localhost:8000/doc
 5. **Images** — In Markdown mode, paste images directly or click the image toolbar button to pick a file. Images are uploaded to the server and inserted as clean URLs
 6. **Capture** — Press `Ctrl+S` (`Cmd+S` on Mac) or click "Screenshot" to capture the current editor as a 1920x1080 PNG slide. Markdown uses `html2canvas`; Canvas uses Excalidraw's native `exportToBlob`
 7. **Slides** — Captured screenshots appear as numbered thumbnails in the right panel with mode badges (MD/Canvas), selection checkboxes, duration controls, and narration support
-8. **Re-edit** — Click "Edit" on any slide to load its content back into the editor (Markdown text or canvas scene) for re-capture
+8. **Re-edit** — Click "Edit" on any slide to load its content back into the editor (Markdown text or canvas scene). Press `Ctrl+S` to re-capture — the existing slide is updated in-place with the new image, keeping its narration and audio intact
 9. **Narration** — Open the narration panel on any slide, enter text (with an expand-to-modal option), and click "Generate" to create TTS audio using a cloned voice
 10. **Export** — Export selected slides as a ZIP or an MP4 video (1920x1080, H.264) with narrated audio and configurable padding
 11. **Manage** — View, edit titles, or delete recordings from the Recordings list page
@@ -96,13 +96,13 @@ Each slide has an `editor_mode` of either `"markdown"` or `"canvas"`:
 - **Markdown** — Split-pane editor with live preview. Preview is clipped to 16:9 with YouTube-optimized fonts (18px base, 36px H1, 15px code). Captured via `html2canvas` at 1920x1080
 - **Canvas** — Full Excalidraw editor with dark theme, all tools enabled. Background color is configurable per slide via a color picker. Captured via Excalidraw's `exportToBlob` at 1920x1080
 
-Scenes are persisted as JSON in the backend. Re-editing loads the scene back into Excalidraw. Canvas scene changes are auto-saved (debounced).
+Scenes (including embedded images) are persisted as JSON in the backend. Re-editing loads the scene back into Excalidraw. Canvas scene changes are auto-saved with a 1-second debounce.
 
 ### Screenshot Capture
 
 **Markdown mode**: `html2canvas` renders the preview pane to a canvas at exactly **1920x1080 pixels**. The canvas is converted to a PNG blob and uploaded along with the Markdown source.
 
-**Canvas mode**: Excalidraw's `exportToBlob` API exports the current scene elements directly to a PNG blob at 1920x1080 with the configured background color. No DOM rendering — native canvas export.
+**Canvas mode**: Excalidraw's `exportToBlob` API exports the current scene elements at their natural bounding box size, then composites the result centered and scaled to fit a 1920x1080 canvas with the configured background color. Embedded images in the scene are included in the export.
 
 Preview font sizes (Markdown) are optimized for YouTube readability:
 - Base text: 18px
@@ -136,7 +136,7 @@ The MP4 export sends selected slide IDs to the backend. The export guards agains
 1. **With audio**: The backend creates a padded audio track (silence + narration + silence) and generates a video segment combining the slide image with the audio using ffmpeg
 2. **Without audio**: The backend creates a video segment from the image with a silent audio track, using the manual duration
 
-All frames are scaled/padded to exactly 1920x1080 by ffmpeg (safety net). Segments are concatenated into a final H.264 MP4 video (`libx264`, `yuv420p`, 30fps, AAC audio at 128kbps).
+All frames are scaled/padded to exactly 1920x1080 by ffmpeg (safety net). All audio segments are normalized to 44100Hz stereo AAC to ensure seamless concatenation. Segments are concatenated into a final H.264 MP4 video (`libx264`, `yuv420p`, 30fps, AAC audio at 128kbps).
 
 ### Auto Port Detection
 
@@ -224,6 +224,7 @@ coding-tutorial-screen-shoter/
 | `POST` | `/api/v1/recordings/{id}/screenshots/{sid}/generate-audio` | Generate TTS audio |
 | `PUT` | `/api/v1/recordings/{id}/screenshots/{sid}/padding` | Update left/right padding |
 | `PUT` | `/api/v1/recordings/{id}/screenshots/{sid}/canvas` | Save canvas scene data + bg color |
+| `PUT` | `/api/v1/recordings/{id}/screenshots/{sid}/image` | Update slide image + metadata in-place |
 | `GET` | `/api/v1/recordings/{id}/screenshots/export` | Download all as ZIP |
 | `GET` | `/api/v1/recordings/{id}/screenshots/export-video` | Export slides as 1920x1080 MP4 |
 
@@ -269,6 +270,7 @@ coding-tutorial-screen-shoter/
 | left_padding | FLOAT | Silence before audio (default 0.0s) |
 | right_padding | FLOAT | Silence after audio (default 0.5s) |
 | created_at | DATETIME | Capture timestamp |
+| updated_at | DATETIME | Last modified timestamp (auto-updated) |
 
 ## Frontend Routes
 
