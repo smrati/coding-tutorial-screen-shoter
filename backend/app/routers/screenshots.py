@@ -47,6 +47,9 @@ async def upload_screenshot(
     image: UploadFile = File(...),
     code_snapshot: str = Form(None),
     narration_text: str = Form(None),
+    editor_mode: str = Form("markdown"),
+    scene_data: str = Form(None),
+    canvas_bg_color: str = Form("#0d1117"),
     db: AsyncSession = Depends(get_db),
 ):
     await _get_recording_or_404(recording_id, db)
@@ -67,8 +70,36 @@ async def upload_screenshot(
         image_data=image_data,
         code_snapshot=code_snapshot,
         narration_text=narration_text,
+        editor_mode=editor_mode,
+        scene_data=scene_data,
+        canvas_bg_color=canvas_bg_color,
     )
     db.add(screenshot)
+    await db.commit()
+    await db.refresh(screenshot)
+    return ScreenshotMeta.model_validate_screenshot(screenshot)
+
+
+@router.put("/{screenshot_id}/image", response_model=ScreenshotMeta)
+async def update_screenshot_image(
+    recording_id: int,
+    screenshot_id: int,
+    image: UploadFile = File(...),
+    code_snapshot: str = Form(None),
+    editor_mode: str = Form("markdown"),
+    scene_data: str = Form(None),
+    canvas_bg_color: str = Form("#0d1117"),
+    db: AsyncSession = Depends(get_db),
+):
+    screenshot = await _get_screenshot_or_404(recording_id, screenshot_id, db)
+    screenshot.image_data = await image.read()
+    if code_snapshot is not None:
+        screenshot.code_snapshot = code_snapshot
+    screenshot.editor_mode = editor_mode
+    if scene_data is not None:
+        screenshot.scene_data = scene_data
+    if canvas_bg_color is not None:
+        screenshot.canvas_bg_color = canvas_bg_color
     await db.commit()
     await db.refresh(screenshot)
     return ScreenshotMeta.model_validate_screenshot(screenshot)
@@ -167,6 +198,26 @@ async def generate_audio(
 class PaddingUpdate(BaseModel):
     left_padding: float = 0.0
     right_padding: float = 0.5
+
+
+class CanvasUpdate(BaseModel):
+    scene_data: str
+    canvas_bg_color: str = "#0d1117"
+
+
+@router.put("/{screenshot_id}/canvas", response_model=ScreenshotMeta)
+async def update_canvas(
+    recording_id: int,
+    screenshot_id: int,
+    body: CanvasUpdate,
+    db: AsyncSession = Depends(get_db),
+):
+    screenshot = await _get_screenshot_or_404(recording_id, screenshot_id, db)
+    screenshot.scene_data = body.scene_data
+    screenshot.canvas_bg_color = body.canvas_bg_color
+    await db.commit()
+    await db.refresh(screenshot)
+    return ScreenshotMeta.model_validate_screenshot(screenshot)
 
 
 @router.put("/{screenshot_id}/padding", response_model=ScreenshotMeta)
@@ -287,6 +338,7 @@ async def export_video(
                     "-i", str(padded_wav),
                     "-c:v", "libx264",
                     "-c:a", "aac", "-b:a", "128k",
+                    "-ar", "44100", "-ac", "2",
                     "-pix_fmt", "yuv420p",
                     "-vf", "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:color=0x0d1117,fps=30,format=yuv420p",
                     "-shortest",

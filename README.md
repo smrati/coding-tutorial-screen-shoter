@@ -1,14 +1,14 @@
 # CodeShot
 
-A web application for creating YouTube-ready coding tutorials. Write content in a Markdown editor with a fixed 16:9 live preview, capture slides at 1920x1080 with `Ctrl+S`, add TTS narration per slide, paste or upload images, and export them as a ZIP of numbered PNGs or an MP4 video with narrated audio.
+A web application for creating YouTube-ready coding tutorials. Choose between a **Markdown editor** with a fixed 16:9 live preview or a **freeform Excalidraw canvas** per slide. Capture at 1920x1080 with `Ctrl+S`, add TTS narration, paste/upload images, and export as a ZIP of PNGs or an MP4 video with narrated audio.
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
 | Frontend | React 19, Vite, TypeScript, Tailwind CSS v4 |
-| Editor | Markdown Editor (via `@uiw/react-md-editor` + `rehype-highlight`) |
-| Screenshot | html2canvas (fixed 1920x1080 output) |
+| Editors | Markdown (`@uiw/react-md-editor` + `rehype-highlight`), Canvas (Excalidraw) |
+| Screenshot | html2canvas (Markdown), Excalidraw `exportToBlob` (Canvas) — both 1920x1080 |
 | TTS | PocketTTS (voice cloning from a single audio sample) |
 | Audio | scipy + ffmpeg (WAV generation, MP3 encoding at 128kbps) |
 | Export | JSZip + file-saver, ffmpeg (server-side H.264 video with AAC audio) |
@@ -78,27 +78,40 @@ API docs are available at [http://localhost:8000/docs](http://localhost:8000/doc
 ### User Flow
 
 1. **Home** — Click "Create New Recording" and enter a title
-2. **Editor** — Write Markdown content in a split-pane editor. The right half is a fixed 16:9 (1920x1080) live preview with YouTube-optimized font sizes. Content that overflows the preview is clipped — what you see is exactly what gets captured
-3. **Images** — Paste images directly into the editor or click the image toolbar button to pick a file. Images are uploaded to the server and inserted as clean URLs (no base64 clutter)
-4. **Capture** — Press `Ctrl+S` (`Cmd+S` on Mac) or click "Screenshot" to capture the preview pane as a 1920x1080 PNG slide
-5. **Slides** — Captured screenshots appear as numbered thumbnails in the right panel with selection checkboxes, duration controls, and narration support
-6. **Narration** — Open the narration panel on any slide, enter text (with an expand-to-modal option for comfortable editing), and click "Generate" to create TTS audio using a cloned voice
-7. **Preview** — Click any slide to open a full-screen preview modal with arrow-key navigation; play audio preview on narrated slides
-8. **Export** — Export selected slides as a ZIP (`1.png`, `2.png`, ...) or an MP4 video (1920x1080, H.264) with narrated audio and configurable padding
-9. **Manage** — View, edit titles, or delete recordings from the Recordings list page
+2. **Choose mode** — Toggle between **Markdown** and **Canvas** (Excalidraw) per slide using the mode switcher at the top of the editor
+3. **Markdown mode** — Write Markdown content in a split-pane editor. The right half is a fixed 16:9 (1920x1080) live preview with YouTube-optimized font sizes. Content that overflows is clipped — what you see is exactly what gets captured
+4. **Canvas mode** — Use the full Excalidraw editor (shapes, text, arrows, images, hand-drawn style) with a configurable per-slide background color. Draw freely within the 16:9 frame
+5. **Images** — In Markdown mode, paste images directly or click the image toolbar button to pick a file. Images are uploaded to the server and inserted as clean URLs
+6. **Capture** — Press `Ctrl+S` (`Cmd+S` on Mac) or click "Screenshot" to capture the current editor as a 1920x1080 PNG slide. Markdown uses `html2canvas`; Canvas uses Excalidraw's native `exportToBlob`
+7. **Slides** — Captured screenshots appear as numbered thumbnails in the right panel with mode badges (MD/Canvas), selection checkboxes, duration controls, and narration support
+8. **Re-edit** — Click "Edit" on any slide to load its content back into the editor (Markdown text or canvas scene) for re-capture
+9. **Narration** — Open the narration panel on any slide, enter text (with an expand-to-modal option), and click "Generate" to create TTS audio using a cloned voice
+10. **Export** — Export selected slides as a ZIP or an MP4 video (1920x1080, H.264) with narrated audio and configurable padding
+11. **Manage** — View, edit titles, or delete recordings from the Recordings list page
+
+### Dual Editor Modes
+
+Each slide has an `editor_mode` of either `"markdown"` or `"canvas"`:
+
+- **Markdown** — Split-pane editor with live preview. Preview is clipped to 16:9 with YouTube-optimized fonts (18px base, 36px H1, 15px code). Captured via `html2canvas` at 1920x1080
+- **Canvas** — Full Excalidraw editor with dark theme, all tools enabled. Background color is configurable per slide via a color picker. Captured via Excalidraw's `exportToBlob` at 1920x1080
+
+Scenes are persisted as JSON in the backend. Re-editing loads the scene back into Excalidraw. Canvas scene changes are auto-saved (debounced).
 
 ### Screenshot Capture
 
-The editor preview pane is constrained to a fixed 16:9 aspect ratio. When the user triggers a capture, `html2canvas` renders the preview pane to a canvas at exactly **1920x1080 pixels** (no scaling — fixed width/height). The canvas is converted to a PNG blob and uploaded to the backend via a multipart request along with the current Markdown source as `code_snapshot`. The backend stores the image as a BLOB in SQLite and assigns it a sequential slide number.
+**Markdown mode**: `html2canvas` renders the preview pane to a canvas at exactly **1920x1080 pixels**. The canvas is converted to a PNG blob and uploaded along with the Markdown source.
 
-Preview font sizes are optimized for YouTube readability:
+**Canvas mode**: Excalidraw's `exportToBlob` API exports the current scene elements directly to a PNG blob at 1920x1080 with the configured background color. No DOM rendering — native canvas export.
+
+Preview font sizes (Markdown) are optimized for YouTube readability:
 - Base text: 18px
 - H1: 36px, H2: 27px, H3: 22.5px
 - Code blocks: 15px monospace
 
 ### Image Handling
 
-Images can be added to the editor in two ways:
+Images can be added to the Markdown editor in two ways:
 1. **Paste** — Paste an image from the clipboard. It uploads to the server and inserts a clean `![image](/api/v1/images/{uuid}.png)` URL
 2. **File picker** — Click the image toolbar button to pick a file from disk. Same upload-and-URL flow
 
@@ -106,12 +119,12 @@ Images are stored as files in `backend/data/images/` and served via a dedicated 
 
 ### TTS Narration
 
-Each slide can have narration text. When the user clicks "Generate", PocketTTS converts the text to speech using a voice cloned from a global voice sample (`backend/data/voice-sample.mp3`). The TTS model is lazy-loaded on first use. The generated audio is converted from WAV to MP3 (128kbps) via ffmpeg and stored as a BLOB. The audio duration is calculated and stored for use in video export timing.
+Each slide can have narration text regardless of editor mode. When the user clicks "Generate", PocketTTS converts the text to speech using a voice cloned from a global voice sample. The generated audio is stored as MP3 (128kbps). The audio duration is used for video export timing.
 
 - **Left padding** (default 0.0s) — silence before audio starts
 - **Right padding** (default 0.5s) — silence after audio ends
 - **Total slide duration** = left_padding + audio_duration + right_padding
-- Padding controls appear as soon as narration text is saved (before audio generation)
+- Padding controls appear as soon as narration text is saved
 - Editing narration text clears the previously generated audio (user must regenerate)
 - Slides without narration fall back to the manual duration slider
 - A full-screen narration modal is available for comfortable long-form text editing
@@ -146,13 +159,13 @@ coding-tutorial-screen-shoter/
 │       ├── tts.py                  # PocketTTS wrapper (lazy-loaded model + voice state)
 │       ├── models/
 │       │   ├── recording.py        # Recording ORM model
-│       │   └── screenshot.py       # Screenshot ORM model (image, audio, narration, padding)
+│       │   └── screenshot.py       # Screenshot ORM model (image, audio, narration, canvas)
 │       ├── schemas/
 │       │   ├── recording.py        # Pydantic request/response schemas
 │       │   └── screenshot.py       # Screenshot metadata schema (has_audio computed)
 │       └── routers/
 │           ├── recordings.py       # CRUD: /api/v1/recordings
-│           ├── screenshots.py      # Upload/serve/delete/export/narration/audio/padding
+│           ├── screenshots.py      # Upload/serve/delete/export/narration/audio/canvas/padding
 │           └── images.py           # Upload/serve editor images: /api/v1/images
 ├── frontend/
 │   ├── package.json
@@ -164,11 +177,13 @@ coding-tutorial-screen-shoter/
 │       │   ├── LandingPage.tsx     # Home page with create button
 │       │   ├── CreateRecordingModal.tsx
 │       │   ├── RecordingsList.tsx  # CRUD list of all recordings
-│       │   ├── RecordingEditor.tsx # Main editor layout (16:9 container + slides panel)
+│       │   ├── RecordingEditor.tsx # Main editor layout (mode switcher + 16:9 container)
 │       │   ├── MarkdownEditor.tsx  # Markdown editor (16:9 clipped preview, custom image upload)
+│       │   ├── CanvasEditor.tsx    # Excalidraw canvas editor (bg color picker, export handle)
+│       │   ├── EditorModeSwitcher.tsx # Markdown/Canvas toggle tabs
 │       │   ├── EditorToolbar.tsx   # Screenshot + Export ZIP/MP4 buttons
 │       │   ├── ScreenshotPanel.tsx  # Right column with slide thumbnails
-│       │   ├── ScreenshotCard.tsx   # Single slide with narration modal, audio, padding
+│       │   ├── ScreenshotCard.tsx   # Single slide with mode badge, edit, narration, audio, padding
 │       │   ├── SlidePreviewModal.tsx # Full-screen slide viewer
 │       │   └── DurationPopover.tsx  # Per-slide duration slider
 │       ├── hooks/
@@ -201,13 +216,14 @@ coding-tutorial-screen-shoter/
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/api/v1/recordings/{id}/screenshots` | Upload screenshot (multipart) |
+| `POST` | `/api/v1/recordings/{id}/screenshots` | Upload screenshot (multipart, with editor_mode/scene_data) |
 | `GET` | `/api/v1/recordings/{id}/screenshots/{sid}/image` | Serve PNG image |
 | `GET` | `/api/v1/recordings/{id}/screenshots/{sid}/audio` | Serve MP3 audio |
 | `DELETE` | `/api/v1/recordings/{id}/screenshots/{sid}` | Delete a screenshot |
 | `PUT` | `/api/v1/recordings/{id}/screenshots/{sid}/narration` | Update narration text |
 | `POST` | `/api/v1/recordings/{id}/screenshots/{sid}/generate-audio` | Generate TTS audio |
 | `PUT` | `/api/v1/recordings/{id}/screenshots/{sid}/padding` | Update left/right padding |
+| `PUT` | `/api/v1/recordings/{id}/screenshots/{sid}/canvas` | Save canvas scene data + bg color |
 | `GET` | `/api/v1/recordings/{id}/screenshots/export` | Download all as ZIP |
 | `GET` | `/api/v1/recordings/{id}/screenshots/export-video` | Export slides as 1920x1080 MP4 |
 
@@ -244,6 +260,9 @@ coding-tutorial-screen-shoter/
 | slide_number | INTEGER | Sequential slide number (unique per recording) |
 | image_data | BLOB | PNG binary data (1920x1080) |
 | code_snapshot | TEXT | Markdown source at time of capture |
+| editor_mode | VARCHAR(10) | `"markdown"` or `"canvas"` (default `"markdown"`) |
+| scene_data | TEXT | Excalidraw scene JSON (canvas mode) |
+| canvas_bg_color | VARCHAR(10) | Canvas background hex color (default `"#0d1117"`) |
 | narration_text | TEXT | Narration script for TTS |
 | audio_data | BLOB | Generated MP3 audio data (128kbps) |
 | audio_duration | FLOAT | Duration of generated audio in seconds |
@@ -257,4 +276,4 @@ coding-tutorial-screen-shoter/
 |------|-----------|-------------|
 | `/` | LandingPage | Home with "Create New Recording" |
 | `/recordings` | RecordingsList | List, edit, delete recordings |
-| `/recording/:id` | RecordingEditor | 16:9 Markdown editor + screenshot panel with narration |
+| `/recording/:id` | RecordingEditor | Markdown/Canvas editor + screenshot panel with narration |

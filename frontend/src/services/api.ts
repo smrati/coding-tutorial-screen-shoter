@@ -27,13 +27,46 @@ export const deleteRecording = (id: number) =>
 export const uploadScreenshot = (
   recordingId: number,
   imageBlob: Blob,
-  codeSnapshot?: string
+  options?: {
+    codeSnapshot?: string;
+    editorMode?: "markdown" | "canvas";
+    sceneData?: string;
+    canvasBgColor?: string;
+  }
 ) => {
   const form = new FormData();
   form.append("image", imageBlob, "screenshot.png");
-  if (codeSnapshot) form.append("code_snapshot", codeSnapshot);
+  if (options?.codeSnapshot) form.append("code_snapshot", options.codeSnapshot);
+  form.append("editor_mode", options?.editorMode ?? "markdown");
+  if (options?.sceneData) form.append("scene_data", options.sceneData);
+  if (options?.canvasBgColor) form.append("canvas_bg_color", options.canvasBgColor);
   return api
     .post<Screenshot>(`/recordings/${recordingId}/screenshots`, form)
+    .then((r) => r.data);
+};
+
+export const updateScreenshotImage = (
+  recordingId: number,
+  screenshotId: number,
+  imageBlob: Blob,
+  options?: {
+    codeSnapshot?: string;
+    editorMode?: "markdown" | "canvas";
+    sceneData?: string;
+    canvasBgColor?: string;
+  }
+) => {
+  const form = new FormData();
+  form.append("image", imageBlob, "screenshot.png");
+  if (options?.codeSnapshot) form.append("code_snapshot", options.codeSnapshot);
+  form.append("editor_mode", options?.editorMode ?? "markdown");
+  if (options?.sceneData) form.append("scene_data", options.sceneData);
+  if (options?.canvasBgColor) form.append("canvas_bg_color", options.canvasBgColor);
+  return api
+    .put<Screenshot>(
+      `/recordings/${recordingId}/screenshots/${screenshotId}/image`,
+      form
+    )
     .then((r) => r.data);
 };
 
@@ -97,3 +130,16 @@ export const uploadImage = async (file: File): Promise<string> => {
   const res = await api.post<{ url: string }>("/images", form);
   return res.data.url;
 };
+
+export const updateCanvas = (
+  recordingId: number,
+  screenshotId: number,
+  sceneData: string,
+  canvasBgColor: string
+) =>
+  api
+    .put<Screenshot>(
+      `/recordings/${recordingId}/screenshots/${screenshotId}/canvas`,
+      { scene_data: sceneData, canvas_bg_color: canvasBgColor }
+    )
+    .then((r) => r.data);

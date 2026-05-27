@@ -20,6 +20,7 @@ interface Props {
   onNarrationChange: (id: number, text: string) => void;
   onGenerateAudio: (id: number) => void;
   onPaddingChange: (id: number, left: number, right: number) => void;
+  onEditSlide: (screenshotId: number) => void;
 }
 
 export default function ScreenshotPanel({
@@ -40,6 +41,7 @@ export default function ScreenshotPanel({
   onNarrationChange,
   onGenerateAudio,
   onPaddingChange,
+  onEditSlide,
 }: Props) {
   const allSelected = screenshots.length > 0 && selectedIds.size === screenshots.length;
 
@@ -85,6 +87,7 @@ export default function ScreenshotPanel({
               recordingId={recordingId}
               screenshotId={s.id}
               slideNumber={s.slide_number}
+              editorMode={s.editor_mode}
               selected={selectedIds.has(s.id)}
               duration={duration}
               isCustomDuration={custom !== undefined}
@@ -94,6 +97,7 @@ export default function ScreenshotPanel({
               leftPadding={s.left_padding}
               rightPadding={s.right_padding}
               isGeneratingAudio={audioGeneratingIds.has(s.id)}
+              updatedAt={s.updated_at}
               onToggleSelect={() => onToggleSelect(s.id)}
               onDelete={() => onDelete(s.id)}
               onPreview={() => onPreview(index)}
@@ -102,6 +106,7 @@ export default function ScreenshotPanel({
               onNarrationChange={(text) => onNarrationChange(s.id, text)}
               onGenerateAudio={() => onGenerateAudio(s.id)}
               onPaddingChange={(left, right) => onPaddingChange(s.id, left, right)}
+              onEdit={() => onEditSlide(s.id)}
             />
           );
         })
