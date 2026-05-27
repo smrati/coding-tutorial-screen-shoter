@@ -18,9 +18,17 @@ export function useScreenshots(recordingId: number | null) {
   }, [recordingId]);
 
   const upload = useCallback(
-    async (imageBlob: Blob, codeSnapshot?: string) => {
+    async (
+      imageBlob: Blob,
+      options?: {
+        codeSnapshot?: string;
+        editorMode?: "markdown" | "canvas";
+        sceneData?: string;
+        canvasBgColor?: string;
+      }
+    ) => {
       if (!recordingId) return;
-      const shot = await uploadScreenshot(recordingId, imageBlob, codeSnapshot);
+      const shot = await uploadScreenshot(recordingId, imageBlob, options);
       setScreenshots((prev) => [...prev, shot]);
       return shot;
     },

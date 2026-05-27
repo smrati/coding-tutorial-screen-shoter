@@ -6,6 +6,7 @@ interface Props {
   recordingId: number;
   screenshotId: number;
   slideNumber: number;
+  editorMode: "markdown" | "canvas";
   selected: boolean;
   duration: number;
   isCustomDuration: boolean;
@@ -15,6 +16,7 @@ interface Props {
   leftPadding: number;
   rightPadding: number;
   isGeneratingAudio: boolean;
+  updatedAt: string | null;
   onToggleSelect: () => void;
   onDelete: () => void;
   onPreview: () => void;
@@ -23,12 +25,14 @@ interface Props {
   onNarrationChange: (text: string) => void;
   onGenerateAudio: () => void;
   onPaddingChange: (left: number, right: number) => void;
+  onEdit: () => void;
 }
 
 export default function ScreenshotCard({
   recordingId,
   screenshotId,
   slideNumber,
+  editorMode,
   selected,
   duration,
   isCustomDuration,
@@ -38,6 +42,7 @@ export default function ScreenshotCard({
   leftPadding,
   rightPadding,
   isGeneratingAudio,
+  updatedAt,
   onToggleSelect,
   onDelete,
   onPreview,
@@ -46,6 +51,7 @@ export default function ScreenshotCard({
   onNarrationChange,
   onGenerateAudio,
   onPaddingChange,
+  onEdit,
 }: Props) {
   const [showNarration, setShowNarration] = useState(false);
   const [showNarrationModal, setShowNarrationModal] = useState(false);
@@ -87,13 +93,16 @@ export default function ScreenshotCard({
     }
   };
 
+  const imgUrl = screenshotImageUrl(recordingId, screenshotId)
+    + (updatedAt ? `?t=${encodeURIComponent(updatedAt)}` : "");
+
   return (
     <div
       className={`group relative bg-gray-700 rounded-lg overflow-hidden cursor-pointer border-2 ${selected ? "border-blue-500" : "border-transparent"}`}
       onClick={onPreview}
     >
       <img
-        src={screenshotImageUrl(recordingId, screenshotId)}
+        src={imgUrl}
         alt={`Slide ${slideNumber}`}
         className="w-full object-contain"
       />
@@ -121,6 +130,21 @@ export default function ScreenshotCard({
       >
         X
       </button>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onEdit();
+        }}
+        className="absolute top-7 right-1 bg-blue-600/80 text-white text-xs px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition"
+        title="Edit in editor"
+      >
+        Edit
+      </button>
+      <span className={`absolute bottom-1 right-1 text-xs px-1.5 py-0.5 rounded ${
+        editorMode === "canvas" ? "bg-purple-600/80 text-white" : "bg-gray-600/80 text-gray-200"
+      }`}>
+        {editorMode === "canvas" ? "Canvas" : "MD"}
+      </span>
 
       <div className="px-2 py-1.5 bg-gray-800/90 space-y-1">
         <div className="flex items-center justify-between">

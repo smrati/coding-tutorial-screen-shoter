@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import MarkdownEditor, { DEFAULT_MARKDOWN } from "./MarkdownEditor";
+import CanvasEditor, { type CanvasEditorHandle } from "./CanvasEditor";
+import EditorModeSwitcher from "./EditorModeSwitcher";
 import EditorToolbar from "./EditorToolbar";
 import ScreenshotPanel from "./ScreenshotPanel";
 import SlidePreviewModal from "./SlidePreviewModal";
@@ -12,6 +14,7 @@ import {
   updateNarration as apiUpdateNarration,
   generateAudio as apiGenerateAudio,
   updatePadding as apiUpdatePadding,
+  updateScreenshotImage as apiUpdateScreenshotImage,
 } from "../services/api";
 
 const STORAGE_KEY = (id: number) => `editor_code_${id}`;
@@ -20,19 +23,22 @@ export default function RecordingEditor() {
   const { id } = useParams<{ id: string }>();
   const recordingId = Number(id);
   const previewRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<CanvasEditorHandle>(null);
   const [capturing, setCapturing] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
   const [exportingVideo, setExportingVideo] = useState(false);
   const [editorValue, setEditorValue] = useState<string | undefined>(undefined);
   const [globalDuration, setGlobalDuration] = useState(2.0);
-  const [slideDurations, setSlideDurations] = useState<Map<number, number>>(
-    new Map()
-  );
-  const [audioGeneratingIds, setAudioGeneratingIds] = useState<Set<number>>(
-    new Set()
-  );
+  const [slideDurations, setSlideDurations] = useState<Map<number, number>>(new Map());
+  const [audioGeneratingIds, setAudioGeneratingIds] = useState<Set<number>>(new Set());
   const [exportWarning, setExportWarning] = useState<string | null>(null);
+
+  const [editorMode, setEditorMode] = useState<"markdown" | "canvas">("markdown");
+  const [canvasBgColor, setCanvasBgColor] = useState("#0d1117");
+  const [canvasSceneData, setCanvasSceneData] = useState<string | null>(null);
+  const [canvasKey, setCanvasKey] = useState(0);
+  const [editingSlideId, setEditingSlideId] = useState<number | null>(null);
 
   const { screenshots, title, refresh, upload, remove, updateScreenshot } =
     useScreenshots(recordingId);
@@ -49,12 +55,10 @@ export default function RecordingEditor() {
   const loadInitialValue = useCallback((): string => {
     const stored = localStorage.getItem(STORAGE_KEY(recordingId));
     if (stored !== null) return stored;
-
     const lastSnapshot = [...screenshots]
       .reverse()
       .find((s) => s.code_snapshot);
     if (lastSnapshot?.code_snapshot) return lastSnapshot.code_snapshot;
-
     return DEFAULT_MARKDOWN;
   }, [screenshots, recordingId]);
 
@@ -91,15 +95,37 @@ export default function RecordingEditor() {
     if (capturing) return;
     setCapturing(true);
     try {
-      const code = editorValue || "";
-      const blob = await captureScreenshot();
-      await upload(blob, code);
+      let blob: Blob;
+      let options: Parameters<typeof upload>[1];
+
+      if (editorMode === "canvas") {
+        blob = await canvasRef.current!.exportImage(canvasBgColor);
+        options = {
+          editorMode: "canvas",
+          sceneData: canvasRef.current?.getSceneData() ?? canvasSceneData ?? undefined,
+          canvasBgColor,
+        };
+      } else {
+        blob = await captureScreenshot();
+        options = {
+          codeSnapshot: editorValue || undefined,
+          editorMode: "markdown",
+        };
+      }
+
+      if (editingSlideId) {
+        const updated = await apiUpdateScreenshotImage(recordingId, editingSlideId, blob, options);
+        updateScreenshot(updated);
+        setEditingSlideId(null);
+      } else {
+        await upload(blob, options);
+      }
     } catch (err) {
       console.error("Screenshot failed:", err);
     } finally {
       setCapturing(false);
     }
-  }, [capturing, captureScreenshot, upload, editorValue]);
+  }, [capturing, captureScreenshot, upload, editorValue, editorMode, canvasBgColor, canvasSceneData, editingSlideId, updateScreenshot]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -147,12 +173,7 @@ export default function RecordingEditor() {
 
   const handlePaddingChange = useCallback(
     async (screenshotId: number, left: number, right: number) => {
-      const updated = await apiUpdatePadding(
-        recordingId,
-        screenshotId,
-        left,
-        right
-      );
+      const updated = await apiUpdatePadding(recordingId, screenshotId, left, right);
       updateScreenshot(updated);
     },
     [recordingId, updateScreenshot]
@@ -191,6 +212,48 @@ export default function RecordingEditor() {
       setExportingVideo(false);
     }
   }, [recordingId, screenshots, selectedIds, title, globalDuration, slideDurations]);
+
+  const handleEditSlide = useCallback((screenshotId: number) => {
+    const slide = screenshots.find((s) => s.id === screenshotId);
+    if (!slide) return;
+
+    setEditingSlideId(screenshotId);
+    setEditorMode(slide.editor_mode);
+
+    if (slide.editor_mode === "markdown" && slide.code_snapshot) {
+      setEditorValue(slide.code_snapshot);
+    } else if (slide.editor_mode === "canvas") {
+      setCanvasSceneData(slide.scene_data);
+      if (slide.canvas_bg_color) setCanvasBgColor(slide.canvas_bg_color);
+      setCanvasKey((k) => k + 1);
+    }
+  }, [screenshots]);
+
+  const handleDeleteSlide = useCallback(
+    async (screenshotId: number) => {
+      if (editingSlideId === screenshotId) {
+        setEditingSlideId(null);
+        if (editorMode === "canvas") {
+          setCanvasSceneData(null);
+          setCanvasKey((k) => k + 1);
+        }
+      }
+      await remove(screenshotId);
+    },
+    [editingSlideId, editorMode, remove]
+  );
+
+  const handleCanvasSceneChange = useCallback((sceneJson: string) => {
+    setCanvasSceneData(sceneJson);
+  }, []);
+
+  const handleCanvasBgColorChange = useCallback((color: string) => {
+    setCanvasBgColor(color);
+  }, []);
+
+  const handleModeChange = useCallback((mode: "markdown" | "canvas") => {
+    setEditorMode(mode);
+  }, []);
 
   const handlePreview = useCallback((index: number) => {
     setPreviewIndex(index);
@@ -249,14 +312,30 @@ export default function RecordingEditor() {
         </div>
       )}
       <div className="flex flex-1 min-h-0">
-        <div className="flex-1 min-w-0 flex items-center justify-center bg-gray-950 p-4">
-          <div className="aspect-video w-full max-h-full border border-gray-700 rounded-lg overflow-hidden">
-            <MarkdownEditor
-              initialValue={editorValue}
-              value={editorValue ?? ""}
-              onChange={handleEditorChange}
-              previewRef={previewRef}
-            />
+        <div className="flex-1 min-w-0 flex flex-col">
+          <div className="px-4 pt-2 flex items-center">
+            <EditorModeSwitcher mode={editorMode} onModeChange={handleModeChange} />
+          </div>
+          <div className="flex-1 flex items-center justify-center bg-gray-950 p-4">
+            <div className="aspect-video w-full max-h-full border border-gray-700 rounded-lg overflow-hidden">
+              {editorMode === "markdown" ? (
+                <MarkdownEditor
+                  initialValue={editorValue}
+                  value={editorValue ?? ""}
+                  onChange={handleEditorChange}
+                  previewRef={previewRef}
+                />
+              ) : (
+                <CanvasEditor
+                  key={canvasKey}
+                  ref={canvasRef}
+                  sceneData={canvasSceneData}
+                  bgColor={canvasBgColor}
+                  onSceneChange={handleCanvasSceneChange}
+                  onBgColorChange={handleCanvasBgColorChange}
+                />
+              )}
+            </div>
           </div>
         </div>
         <ScreenshotPanel
@@ -269,7 +348,7 @@ export default function RecordingEditor() {
           onToggleSelect={toggleSelect}
           onSelectAll={selectAll}
           onDeselectAll={deselectAll}
-          onDelete={remove}
+          onDelete={handleDeleteSlide}
           onPreview={handlePreview}
           onGlobalDurationChange={handleGlobalDurationChange}
           onSlideDurationChange={handleSlideDurationChange}
@@ -277,6 +356,7 @@ export default function RecordingEditor() {
           onNarrationChange={handleNarrationChange}
           onGenerateAudio={handleGenerateAudio}
           onPaddingChange={handlePaddingChange}
+          onEditSlide={handleEditSlide}
         />
       </div>
       {previewIndex !== null && (
