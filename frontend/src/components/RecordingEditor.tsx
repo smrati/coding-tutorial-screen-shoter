@@ -39,6 +39,7 @@ export default function RecordingEditor() {
   const [canvasSceneData, setCanvasSceneData] = useState<string | null>(null);
   const [canvasKey, setCanvasKey] = useState(0);
   const [editingSlideId, setEditingSlideId] = useState<number | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const { screenshots, title, refresh, upload, clone, remove, updateScreenshot } =
     useScreenshots(recordingId);
@@ -277,6 +278,10 @@ export default function RecordingEditor() {
     setEditorMode(mode);
   }, []);
 
+  const handleToggleFullscreen = useCallback(() => {
+    setIsFullscreen((prev) => !prev);
+  }, []);
+
   const handlePreview = useCallback((index: number) => {
     setPreviewIndex(index);
   }, []);
@@ -312,6 +317,80 @@ export default function RecordingEditor() {
     });
   }, []);
 
+  const editorContent = (
+    <div className="aspect-video w-full max-h-full border border-gray-700 rounded-lg overflow-hidden">
+      {editorMode === "markdown" ? (
+        <MarkdownEditor
+          initialValue={editorValue}
+          value={editorValue ?? ""}
+          onChange={handleEditorChange}
+          previewRef={previewRef}
+        />
+      ) : (
+        <CanvasEditor
+          key={canvasKey}
+          ref={canvasRef}
+          sceneData={canvasSceneData}
+          bgColor={canvasBgColor}
+          onSceneChange={handleCanvasSceneChange}
+          onBgColorChange={handleCanvasBgColorChange}
+        />
+      )}
+    </div>
+  );
+
+  if (isFullscreen) {
+    return (
+      <div className="fixed inset-0 z-50 bg-gray-950 flex flex-col">
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-gray-800/90 backdrop-blur rounded-lg px-3 py-2 shadow-lg">
+          {editingSlideNumber !== null && (
+            <span className="text-amber-300 text-xs font-medium">
+              Editing #{editingSlideNumber}
+            </span>
+          )}
+          <button
+            onClick={handleCapture}
+            disabled={capturing}
+            className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm font-medium px-3 py-1.5 rounded transition"
+          >
+            {capturing ? "Saving..." : editingSlideNumber !== null ? "Save Edit" : "Screenshot"}
+          </button>
+          {editingSlideNumber !== null && (
+            <button
+              onClick={handleCancelEdit}
+              className="bg-gray-600 hover:bg-gray-500 text-white text-sm font-medium px-3 py-1.5 rounded transition"
+            >
+              Cancel
+            </button>
+          )}
+          <span className={`text-xs px-2 py-1 rounded ${
+            editorMode === "canvas" ? "bg-purple-600/80 text-white" : "bg-gray-600/80 text-gray-200"
+          }`}>
+            {editorMode === "canvas" ? "Canvas" : "MD"}
+          </span>
+          <button
+            onClick={handleToggleFullscreen}
+            className="bg-gray-600 hover:bg-gray-500 text-white text-sm font-medium px-3 py-1.5 rounded transition"
+          >
+            Exit
+          </button>
+        </div>
+        <div className="flex-1 flex items-center justify-center p-4">
+          {editorContent}
+        </div>
+        {previewIndex !== null && (
+          <SlidePreviewModal
+            recordingId={recordingId}
+            screenshots={screenshots}
+            currentIndex={previewIndex}
+            onClose={handleClosePreview}
+            onNavigate={handleNavigatePreview}
+          />
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-[calc(100vh-56px)] bg-gray-950">
       <EditorToolbar
@@ -321,6 +400,7 @@ export default function RecordingEditor() {
         onExport={handleExport}
         onExportVideo={handleExportVideo}
         onCancelEdit={handleCancelEdit}
+        onToggleFullscreen={handleToggleFullscreen}
         capturing={capturing}
         exportingVideo={exportingVideo}
       />
@@ -352,25 +432,7 @@ export default function RecordingEditor() {
             </div>
           )}
           <div className="flex-1 flex items-center justify-center bg-gray-950 p-4">
-            <div className="aspect-video w-full max-h-full border border-gray-700 rounded-lg overflow-hidden">
-              {editorMode === "markdown" ? (
-                <MarkdownEditor
-                  initialValue={editorValue}
-                  value={editorValue ?? ""}
-                  onChange={handleEditorChange}
-                  previewRef={previewRef}
-                />
-              ) : (
-                <CanvasEditor
-                  key={canvasKey}
-                  ref={canvasRef}
-                  sceneData={canvasSceneData}
-                  bgColor={canvasBgColor}
-                  onSceneChange={handleCanvasSceneChange}
-                  onBgColorChange={handleCanvasBgColorChange}
-                />
-              )}
-            </div>
+            {editorContent}
           </div>
         </div>
         <ScreenshotPanel

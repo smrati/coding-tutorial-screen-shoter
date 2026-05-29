@@ -5,6 +5,7 @@ interface Props {
   onExport: () => void;
   onExportVideo: () => void;
   onCancelEdit: () => void;
+  onToggleFullscreen: () => void;
   capturing: boolean;
   exportingVideo: boolean;
 }
@@ -16,6 +17,7 @@ export default function EditorToolbar({
   onExport,
   onExportVideo,
   onCancelEdit,
+  onToggleFullscreen,
   capturing,
   exportingVideo,
 }: Props) {
@@ -47,6 +49,13 @@ export default function EditorToolbar({
             Cancel
           </button>
         )}
+        <button
+          onClick={onToggleFullscreen}
+          className="bg-gray-600 hover:bg-gray-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
+          title="Fullscreen editor"
+        >
+          Fullscreen
+        </button>
         <button
           onClick={onExport}
           className="bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
