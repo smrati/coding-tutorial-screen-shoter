@@ -253,6 +253,18 @@ export default function RecordingEditor() {
     [clone]
   );
 
+  const handleCancelEdit = useCallback(() => {
+    setEditingSlideId(null);
+    if (editorMode === "canvas") {
+      setCanvasSceneData(null);
+      setCanvasKey((k) => k + 1);
+    }
+  }, [editorMode]);
+
+  const editingSlideNumber = editingSlideId
+    ? screenshots.find((s) => s.id === editingSlideId)?.slide_number ?? null
+    : null;
+
   const handleCanvasSceneChange = useCallback((sceneJson: string) => {
     setCanvasSceneData(sceneJson);
   }, []);
@@ -304,9 +316,11 @@ export default function RecordingEditor() {
     <div className="flex flex-col h-[calc(100vh-56px)] bg-gray-950">
       <EditorToolbar
         title={title}
+        editingSlideNumber={editingSlideNumber}
         onCapture={handleCapture}
         onExport={handleExport}
         onExportVideo={handleExportVideo}
+        onCancelEdit={handleCancelEdit}
         capturing={capturing}
         exportingVideo={exportingVideo}
       />
@@ -326,6 +340,17 @@ export default function RecordingEditor() {
           <div className="px-4 pt-2 flex items-center">
             <EditorModeSwitcher mode={editorMode} onModeChange={handleModeChange} />
           </div>
+          {editingSlideNumber !== null && (
+            <div className="mx-4 mt-2 flex items-center justify-between bg-amber-900/60 border border-amber-700/50 text-amber-200 text-sm px-3 py-1.5 rounded-lg">
+              <span>Editing Slide #{editingSlideNumber} — press Ctrl+S or click Save Edit</span>
+              <button
+                onClick={handleCancelEdit}
+                className="text-amber-400 hover:text-white text-sm ml-3"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
           <div className="flex-1 flex items-center justify-center bg-gray-950 p-4">
             <div className="aspect-video w-full max-h-full border border-gray-700 rounded-lg overflow-hidden">
               {editorMode === "markdown" ? (
