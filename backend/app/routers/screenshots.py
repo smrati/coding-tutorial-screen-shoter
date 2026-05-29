@@ -105,6 +105,39 @@ async def update_screenshot_image(
     return ScreenshotMeta.model_validate_screenshot(screenshot)
 
 
+@router.post("/{screenshot_id}/clone", response_model=ScreenshotMeta, status_code=201)
+async def clone_screenshot(
+    recording_id: int,
+    screenshot_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    await _get_recording_or_404(recording_id, db)
+    source = await _get_screenshot_or_404(recording_id, screenshot_id, db)
+
+    max_slide = (
+        await db.execute(
+            select(func.coalesce(func.max(Screenshot.slide_number), 0)).where(
+                Screenshot.recording_id == recording_id
+            )
+        )
+    ).scalar() or 0
+
+    clone = Screenshot(
+        recording_id=recording_id,
+        slide_number=max_slide + 1,
+        image_data=source.image_data,
+        code_snapshot=source.code_snapshot,
+        editor_mode=source.editor_mode,
+        scene_data=source.scene_data,
+        canvas_bg_color=source.canvas_bg_color,
+        narration_text=source.narration_text,
+    )
+    db.add(clone)
+    await db.commit()
+    await db.refresh(clone)
+    return ScreenshotMeta.model_validate_screenshot(clone)
+
+
 @router.get("/{screenshot_id}/image")
 async def get_screenshot_image(
     recording_id: int, screenshot_id: int, db: AsyncSession = Depends(get_db)

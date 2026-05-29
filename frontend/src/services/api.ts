@@ -45,6 +45,13 @@ export const uploadScreenshot = (
     .then((r) => r.data);
 };
 
+export const cloneScreenshot = (recordingId: number, screenshotId: number) =>
+  api
+    .post<Screenshot>(
+      `/recordings/${recordingId}/screenshots/${screenshotId}/clone`
+    )
+    .then((r) => r.data);
+
 export const updateScreenshotImage = (
   recordingId: number,
   screenshotId: number,

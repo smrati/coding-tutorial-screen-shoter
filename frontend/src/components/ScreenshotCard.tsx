@@ -26,6 +26,7 @@ interface Props {
   onGenerateAudio: () => void;
   onPaddingChange: (left: number, right: number) => void;
   onEdit: () => void;
+  onClone: () => void;
 }
 
 export default function ScreenshotCard({
@@ -52,6 +53,7 @@ export default function ScreenshotCard({
   onGenerateAudio,
   onPaddingChange,
   onEdit,
+  onClone,
 }: Props) {
   const [showNarration, setShowNarration] = useState(false);
   const [showNarrationModal, setShowNarrationModal] = useState(false);
@@ -139,6 +141,16 @@ export default function ScreenshotCard({
         title="Edit in editor"
       >
         Edit
+      </button>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onClone();
+        }}
+        className="absolute top-13 right-1 bg-green-600/80 text-white text-xs px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition"
+        title="Clone slide"
+      >
+        Clone
       </button>
       <span className={`absolute bottom-1 right-1 text-xs px-1.5 py-0.5 rounded ${
         editorMode === "canvas" ? "bg-purple-600/80 text-white" : "bg-gray-600/80 text-gray-200"

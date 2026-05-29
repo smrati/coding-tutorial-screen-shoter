@@ -21,6 +21,7 @@ interface Props {
   onGenerateAudio: (id: number) => void;
   onPaddingChange: (id: number, left: number, right: number) => void;
   onEditSlide: (screenshotId: number) => void;
+  onCloneSlide: (screenshotId: number) => void;
 }
 
 export default function ScreenshotPanel({
@@ -42,6 +43,7 @@ export default function ScreenshotPanel({
   onGenerateAudio,
   onPaddingChange,
   onEditSlide,
+  onCloneSlide,
 }: Props) {
   const allSelected = screenshots.length > 0 && selectedIds.size === screenshots.length;
 
@@ -107,6 +109,7 @@ export default function ScreenshotPanel({
               onGenerateAudio={() => onGenerateAudio(s.id)}
               onPaddingChange={(left, right) => onPaddingChange(s.id, left, right)}
               onEdit={() => onEditSlide(s.id)}
+              onClone={() => onCloneSlide(s.id)}
             />
           );
         })

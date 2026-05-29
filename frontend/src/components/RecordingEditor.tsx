@@ -40,7 +40,7 @@ export default function RecordingEditor() {
   const [canvasKey, setCanvasKey] = useState(0);
   const [editingSlideId, setEditingSlideId] = useState<number | null>(null);
 
-  const { screenshots, title, refresh, upload, remove, updateScreenshot } =
+  const { screenshots, title, refresh, upload, clone, remove, updateScreenshot } =
     useScreenshots(recordingId);
   const captureScreenshot = useScreenshotCapture(previewRef);
 
@@ -243,6 +243,16 @@ export default function RecordingEditor() {
     [editingSlideId, editorMode, remove]
   );
 
+  const handleCloneSlide = useCallback(
+    async (screenshotId: number) => {
+      const cloned = await clone(screenshotId);
+      if (cloned) {
+        setSelectedIds((prev) => new Set(prev).add(cloned.id));
+      }
+    },
+    [clone]
+  );
+
   const handleCanvasSceneChange = useCallback((sceneJson: string) => {
     setCanvasSceneData(sceneJson);
   }, []);
@@ -357,6 +367,7 @@ export default function RecordingEditor() {
           onGenerateAudio={handleGenerateAudio}
           onPaddingChange={handlePaddingChange}
           onEditSlide={handleEditSlide}
+          onCloneSlide={handleCloneSlide}
         />
       </div>
       {previewIndex !== null && (
