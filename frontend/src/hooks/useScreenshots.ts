@@ -3,6 +3,7 @@ import type { Screenshot } from "../types";
 import {
   fetchRecording,
   uploadScreenshot,
+  cloneScreenshot as apiClone,
   deleteScreenshot as apiDelete,
 } from "../services/api";
 
@@ -35,6 +36,16 @@ export function useScreenshots(recordingId: number | null) {
     [recordingId]
   );
 
+  const clone = useCallback(
+    async (screenshotId: number) => {
+      if (!recordingId) return;
+      const shot = await apiClone(recordingId, screenshotId);
+      setScreenshots((prev) => [...prev, shot]);
+      return shot;
+    },
+    [recordingId]
+  );
+
   const remove = useCallback(
     async (screenshotId: number) => {
       if (!recordingId) return;
@@ -54,5 +65,5 @@ export function useScreenshots(recordingId: number | null) {
     );
   }, []);
 
-  return { screenshots, title, refresh, upload, remove, updateScreenshot };
+  return { screenshots, title, refresh, upload, clone, remove, updateScreenshot };
 }
