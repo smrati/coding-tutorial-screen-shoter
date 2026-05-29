@@ -90,6 +90,12 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, Props>(
       };
     }, []);
 
+    useEffect(() => {
+      const api = apiRef.current;
+      if (!api) return;
+      api.updateScene({ appState: { viewBackgroundColor: bgColor } });
+    }, [bgColor]);
+
     const parsed = sceneData ? JSON.parse(sceneData) : null;
     const initialElements = parsed
       ? Array.isArray(parsed) ? parsed : parsed.elements || []
