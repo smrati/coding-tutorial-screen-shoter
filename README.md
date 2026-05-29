@@ -1,6 +1,6 @@
 # CodeShot
 
-A web application for creating YouTube-ready coding tutorials. Choose between a **Markdown editor** with a fixed 16:9 live preview or a **freeform Excalidraw canvas** per slide. Capture at 1920x1080 with `Ctrl+S`, add TTS narration, paste/upload images, and export as a ZIP of PNGs or an MP4 video with narrated audio.
+A web application for creating YouTube-ready coding tutorials. Choose between a **Markdown editor** with a fixed 16:9 live preview or a **freeform Excalidraw canvas** per slide. Capture at 1920x1080 with `Ctrl+S`, add TTS narration, paste/upload images, clone slides, edit in fullscreen, and export as a ZIP of PNGs or a high-quality MP4 video with narrated audio.
 
 ## Tech Stack
 
@@ -81,20 +81,22 @@ API docs are available at [http://localhost:8000/docs](http://localhost:8000/doc
 2. **Choose mode** — Toggle between **Markdown** and **Canvas** (Excalidraw) per slide using the mode switcher at the top of the editor
 3. **Markdown mode** — Write Markdown content in a split-pane editor. The right half is a fixed 16:9 (1920x1080) live preview with YouTube-optimized font sizes. Content that overflows is clipped — what you see is exactly what gets captured
 4. **Canvas mode** — Use the full Excalidraw editor (shapes, text, arrows, images, hand-drawn style) with a configurable per-slide background color. Draw freely within the 16:9 frame
-5. **Images** — In Markdown mode, paste images directly or click the image toolbar button to pick a file. Images are uploaded to the server and inserted as clean URLs
+5. **Images** — In Markdown mode, paste images directly or click the image toolbar button to pick a file. Images are uploaded to the server and inserted as clean URLs. In Canvas mode, paste images directly onto the canvas
 6. **Capture** — Press `Ctrl+S` (`Cmd+S` on Mac) or click "Screenshot" to capture the current editor as a 1920x1080 PNG slide. Markdown uses `html2canvas`; Canvas uses Excalidraw's native `exportToBlob`
 7. **Slides** — Captured screenshots appear as numbered thumbnails in the right panel with mode badges (MD/Canvas), selection checkboxes, duration controls, and narration support
-8. **Re-edit** — Click "Edit" on any slide to load its content back into the editor (Markdown text or canvas scene). Press `Ctrl+S` to re-capture — the existing slide is updated in-place with the new image, keeping its narration and audio intact
-9. **Narration** — Open the narration panel on any slide, enter text (with an expand-to-modal option), and click "Generate" to create TTS audio using a cloned voice
-10. **Export** — Export selected slides as a ZIP or an MP4 video (1920x1080, H.264) with narrated audio and configurable padding
-11. **Manage** — View, edit titles, or delete recordings from the Recordings list page
+8. **Re-edit** — Click "Edit" on any slide to load its content back into the editor (Markdown text or canvas scene). The toolbar shows a "Save Edit" button and an amber "Editing Slide #N" badge. Press `Ctrl+S` to re-capture — the existing slide is updated in-place, keeping its narration and audio intact. Click "Cancel" to exit edit mode
+9. **Clone** — Click "Clone" on any slide to duplicate it with all content (image, editor mode, code/scene data, narration text). Audio is not cloned — regenerate TTS for the copy. Padding resets to defaults
+10. **Fullscreen** — Click "Fullscreen" in the toolbar to expand the editor to fill the entire viewport. A floating toolbar at the top-center provides Screenshot/Save Edit, Cancel, mode badge, and Exit controls. The 16:9 aspect ratio is maintained. Markdown mode stays split-pane. Press `Ctrl+S` to capture from fullscreen
+11. **Narration** — Open the narration panel on any slide, enter text (with an expand-to-modal option), and click "Generate" to create TTS audio using a cloned voice
+12. **Export** — Export selected slides as a ZIP or an MP4 video (1920x1080, H.264, CRF 18 high-quality) with narrated audio and configurable padding
+13. **Manage** — View, edit titles, or delete recordings from the Recordings list page
 
 ### Dual Editor Modes
 
 Each slide has an `editor_mode` of either `"markdown"` or `"canvas"`:
 
 - **Markdown** — Split-pane editor with live preview. Preview is clipped to 16:9 with YouTube-optimized fonts (18px base, 36px H1, 15px code). Captured via `html2canvas` at 1920x1080
-- **Canvas** — Full Excalidraw editor with dark theme, all tools enabled. Background color is configurable per slide via a color picker. Captured via Excalidraw's `exportToBlob` at 1920x1080
+- **Canvas** — Full Excalidraw editor with dark theme, all tools enabled. Background color is configurable per slide via a color picker that syncs with the live canvas. Pasted images are captured via the `onChange` callback and included in exports. Captured via Excalidraw's `exportToBlob`, composited centered on 1920x1080
 
 Scenes (including embedded images) are persisted as JSON in the backend. Re-editing loads the scene back into Excalidraw. Canvas scene changes are auto-saved with a 1-second debounce.
 
@@ -136,7 +138,22 @@ The MP4 export sends selected slide IDs to the backend. The export guards agains
 1. **With audio**: The backend creates a padded audio track (silence + narration + silence) and generates a video segment combining the slide image with the audio using ffmpeg
 2. **Without audio**: The backend creates a video segment from the image with a silent audio track, using the manual duration
 
-All frames are scaled/padded to exactly 1920x1080 by ffmpeg (safety net). All audio segments are normalized to 44100Hz stereo AAC to ensure seamless concatenation. Segments are concatenated into a final H.264 MP4 video (`libx264`, `yuv420p`, 30fps, AAC audio at 128kbps).
+All frames are scaled/padded to exactly 1920x1080 by ffmpeg (safety net). All audio segments are normalized to 44100Hz stereo AAC to ensure seamless concatenation. Segments are concatenated into a final H.264 MP4 video optimized for sharp text and screen content: `libx264`, CRF 18 (high quality), `slow` preset, `stillimage` tune, `yuv420p`, 30fps, AAC audio at 128kbps.
+
+### Fullscreen Editor
+
+Click the "Fullscreen" button in the toolbar to expand the editor to fill the entire viewport. The top toolbar and right slides panel are hidden, replaced by a floating toolbar at the top-center with essential controls (Screenshot/Save Edit, Cancel, mode badge, Exit). The editor maintains its 16:9 aspect ratio but is much larger since chrome is removed. `Ctrl+S` works in fullscreen. Click "Exit" or the toolbar's "Fullscreen" button to return to normal mode.
+
+### Slide Cloning
+
+Click "Clone" (hover-revealed green button on each slide card) to duplicate a slide. The clone copies the image, editor mode, code snapshot/scene data, background color, and narration text. Audio is not cloned (regenerate TTS for the copy). Padding resets to defaults (0.0 / 0.5). The cloned slide appears at the end and is auto-selected.
+
+### Edit Mode
+
+When editing an existing slide (via the "Edit" button), the UI provides clear feedback:
+- **Toolbar**: amber "Editing Slide #N" badge, button changes to "Save Edit", "Cancel" button appears
+- **Editor area**: amber banner with "press Ctrl+S or click Save Edit" hint
+- **Cancel**: exits edit mode and resets the editor state
 
 ### Auto Port Detection
 
@@ -177,18 +194,18 @@ coding-tutorial-screen-shoter/
 │       │   ├── LandingPage.tsx     # Home page with create button
 │       │   ├── CreateRecordingModal.tsx
 │       │   ├── RecordingsList.tsx  # CRUD list of all recordings
-│       │   ├── RecordingEditor.tsx # Main editor layout (mode switcher + 16:9 container)
+│       │   ├── RecordingEditor.tsx # Main editor layout (mode switcher, fullscreen, edit mode, 16:9 container)
 │       │   ├── MarkdownEditor.tsx  # Markdown editor (16:9 clipped preview, custom image upload)
-│       │   ├── CanvasEditor.tsx    # Excalidraw canvas editor (bg color picker, export handle)
+│       │   ├── CanvasEditor.tsx    # Excalidraw canvas editor (bg color sync, onChange files, export compositing)
 │       │   ├── EditorModeSwitcher.tsx # Markdown/Canvas toggle tabs
-│       │   ├── EditorToolbar.tsx   # Screenshot + Export ZIP/MP4 buttons
+│       │   ├── EditorToolbar.tsx   # Toolbar with Screenshot/Save Edit, Fullscreen, Export buttons + edit badge
 │       │   ├── ScreenshotPanel.tsx  # Right column with slide thumbnails
-│       │   ├── ScreenshotCard.tsx   # Single slide with mode badge, edit, narration, audio, padding
+│       │   ├── ScreenshotCard.tsx   # Single slide with mode badge, edit, clone, narration, audio, padding
 │       │   ├── SlidePreviewModal.tsx # Full-screen slide viewer
 │       │   └── DurationPopover.tsx  # Per-slide duration slider
 │       ├── hooks/
 │       │   ├── useRecordings.ts    # Recording CRUD state management
-│       │   ├── useScreenshots.ts   # Screenshot state per recording (with updateScreenshot)
+│       │   ├── useScreenshots.ts   # Screenshot state per recording (upload, clone, update, remove)
 │       │   └── useScreenshotCapture.ts  # html2canvas capture at 1920x1080
 │       ├── services/
 │       │   └── api.ts              # Axios HTTP client + all API functions
@@ -225,6 +242,7 @@ coding-tutorial-screen-shoter/
 | `PUT` | `/api/v1/recordings/{id}/screenshots/{sid}/padding` | Update left/right padding |
 | `PUT` | `/api/v1/recordings/{id}/screenshots/{sid}/canvas` | Save canvas scene data + bg color |
 | `PUT` | `/api/v1/recordings/{id}/screenshots/{sid}/image` | Update slide image + metadata in-place |
+| `POST` | `/api/v1/recordings/{id}/screenshots/{sid}/clone` | Clone a slide (copies content, not audio) |
 | `GET` | `/api/v1/recordings/{id}/screenshots/export` | Download all as ZIP |
 | `GET` | `/api/v1/recordings/{id}/screenshots/export-video` | Export slides as 1920x1080 MP4 |
 
