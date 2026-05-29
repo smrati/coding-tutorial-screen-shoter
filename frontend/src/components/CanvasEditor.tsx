@@ -17,8 +17,9 @@ interface Props {
 
 const CanvasEditor = forwardRef<CanvasEditorHandle, Props>(
   ({ sceneData, bgColor, onSceneChange, onBgColorChange }, ref) => {
-    const apiRef = useRef<ExcalidrawImperativeAPI>(null);
-    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const apiRef = useRef<ExcalidrawImperativeAPI>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const filesRef = useRef<Record<string, never> | null>(null);
 
     useImperativeHandle(ref, () => ({
       exportImage: async (bg: string) => {
@@ -26,7 +27,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, Props>(
         if (!api) throw new Error("Excalidraw not initialized");
 
         const elements = api.getSceneElements();
-        const files = (api as never as { files: Record<string, never> | null }).files;
+        const files = filesRef.current;
 
         if (elements.length === 0) {
           const canvas = document.createElement("canvas");
@@ -68,21 +69,24 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, Props>(
         const api = apiRef.current;
         if (!api) return "[]";
         const elements = api.getSceneElements();
-        const files = (api as never as { files: Record<string, never> | null }).files;
+        const files = filesRef.current;
         return JSON.stringify({ elements, files });
       },
     }));
 
-    const handleChange = useCallback(() => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => {
-        const api = apiRef.current;
-        if (!api) return;
-        const elements = api.getSceneElements();
-        const files = (api as never as { files: Record<string, never> | null }).files;
-        onSceneChange(JSON.stringify({ elements, files }));
-      }, 1000);
-    }, [onSceneChange]);
+    const handleChange = useCallback(
+      (_elements: never[], _appState: never, files: Record<string, never> | null) => {
+        if (files) filesRef.current = files;
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => {
+          const api = apiRef.current;
+          if (!api) return;
+          const elements = api.getSceneElements();
+          onSceneChange(JSON.stringify({ elements, files: filesRef.current }));
+        }, 1000);
+      },
+      [onSceneChange]
+    );
 
     useEffect(() => {
       return () => {
